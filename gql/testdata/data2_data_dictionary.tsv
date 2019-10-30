@@ -1,0 +1,9 @@
+# comment line
+column_name	type	description
+A	int	an int
+B	string	random string
+C	enum	enum without values
+D	float	float
+E	char	char
+F	datetime	datetime
+G	date	date

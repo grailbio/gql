@@ -1,0 +1,14 @@
+// sample(table, N)
+//
+// sample picks 1/N rows deterministically randomly from the given table.
+// N must be an integer. The bollowing example picks one out of 1000
+// rows from foo.tsv.
+//
+//  read(`foo.tsv`) | sample(1000)
+//
+func sample(x, ratio) filter(x, hash64(_) % ratio == 0);
+
+// basename(path)
+//
+// The same as go's filepath.Base.
+func basename(path) regexp_replace(path, ".*/([^/]+)$", "${1}")

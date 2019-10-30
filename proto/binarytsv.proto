@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package grail.proto.gql;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option go_package = "github.com/grailbio/gql/gqlpb";
+
+// Defines the index structure. It is serialized and stored in the recordio
+// trailer.
+message BinaryTSVIndex {
+  int64 rows = 1;  // Total # of rows in the table shard.
+
+  message Column {
+    int32 col = 1;           // matches col index encoded in a serialized col.
+    int32 typ = 2;           // gql.ValueType
+    string name = 3;         // Human-readable column name.
+    string description = 4;  // Optional description
+  }
+
+  // List of columns that appear in the table.  The columns are topologically
+  // sorted, so that the order of columns[] here is consistent is the order of
+  // columns in every row. Note that the topological order may not match the
+  // Column.col order. The latter is assigned on a FCFS basis.
+  repeated Column column = 2 [(gogoproto.nullable) = false];
+
+  // List of timezones that appear in the table.
+  message TimeLocation {
+    // time.Location.String() value. If the timezone database is available on
+    // the reader machine, we use Str to construct the time.Location object.
+    string str = 1;
+
+    // Name and Offset are used to construct a fixed time.Location, in case we
+    // fail to load the timezone database.
+    string name = 2;     // "PST", etc
+    int32 offset_s = 3;  // Offset from GMT in seconds.
+  }
+  // Deduped list of timezones that appear in the TSV cells. Referred to by
+  // BinaryTSVCell.tz_id.
+  repeated TimeLocation time_location = 3 [(gogoproto.nullable) = false];
+
+  // Copied from TableAttr.Name.
+  string name = 5;
+
+  // Stores the name of the source file file from which this table was
+  // created. Copied from TableAttr.Path. For debugging.
+  string path = 6;
+
+  // Descriptions of this file. For debugging.
+  repeated string description = 4;
+
+  // Serialized marshal context. Contains bindings and callframes that may be
+  // referenced by values in the table. This field is usually empty.
+  bytes marshaled_context = 7;
+}

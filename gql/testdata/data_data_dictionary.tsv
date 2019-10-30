@@ -1,0 +1,6 @@
+column_name	type	description
+A	int	an int
+B	String	random string
+C	enum	enum without values
+D	Integer	legacy int
+E	String	legacy string

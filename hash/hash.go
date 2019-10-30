@@ -1,0 +1,143 @@
+// Package hash provides functions for computing a hash of vql values and AST
+// nodes. Hash is ultimately used as an UID of a Table, so that it can be cached
+// and reused across computations.
+package hash
+
+import (
+	"encoding/binary"
+	"fmt"
+	"time"
+	"unsafe"
+
+	gunsafe "github.com/grailbio/base/unsafe"
+	"github.com/minio/highwayhash"
+)
+
+const hashBytes = 32
+
+// Hash uniquely identifies a Value or an AST node.
+type Hash [hashBytes]byte
+
+var (
+	// Zero is an all-zero hash value.
+	Zero       = Hash{}
+	stringSeed = Hash{
+		0xa2, 0x57, 0xb6, 0xa4, 0x5c, 0xc9, 0xec, 0xe0,
+		0x5e, 0x82, 0x61, 0x18, 0x0e, 0xd8, 0x16, 0xac,
+		0xb9, 0x2c, 0xb1, 0x04, 0xd1, 0x1b, 0x57, 0x18,
+		0xb1, 0xa5, 0x52, 0xca, 0x74, 0x39, 0x83, 0x8d}
+	bytesSeed = Hash{
+		0xf8, 0x59, 0xc4, 0xc6, 0x02, 0xd5, 0x53, 0xaa,
+		0xc6, 0xea, 0x50, 0xb1, 0x96, 0xc5, 0xc2, 0x9c,
+		0xbd, 0xea, 0x04, 0x0b, 0x3e, 0xb1, 0xab, 0x3c,
+		0x9a, 0x00, 0xa3, 0x37, 0xbe, 0xf4, 0xd0, 0xe9}
+	intSeed = Hash{
+		0xdb, 0x13, 0x01, 0xd1, 0xcb, 0xca, 0x16, 0x4f,
+		0xea, 0xa7, 0x24, 0x44, 0x11, 0xb5, 0x9e, 0xda,
+		0xd0, 0x04, 0x20, 0x67, 0x0e, 0x60, 0xbc, 0x76,
+		0x08, 0xdf, 0xc4, 0x17, 0x83, 0x0e, 0x27, 0x32}
+	floatSeed = Hash{
+		0xb8, 0x35, 0x63, 0x19, 0x18, 0x90, 0x11, 0xa2,
+		0xcc, 0x64, 0xfc, 0x69, 0x05, 0x58, 0xaf, 0x26,
+		0xa4, 0x59, 0x2c, 0x8e, 0xdf, 0x03, 0x53, 0x94,
+		0x5e, 0x69, 0x87, 0x3a, 0x81, 0xe7, 0x9e, 0x5e}
+	boolSeed = Hash{
+		0x99, 0x1a, 0x3a, 0x76, 0xd5, 0x30, 0x96, 0x32,
+		0xb9, 0x36, 0x14, 0xad, 0x2f, 0x8d, 0xc5, 0xf0,
+		0xe3, 0xef, 0xc0, 0x3a, 0x54, 0x58, 0xcf, 0x3a,
+		0x9f, 0xc6, 0x99, 0x1b, 0x5f, 0x6b, 0xa5, 0xa1}
+	timeSeed = Hash{
+		0xe3, 0xc9, 0xde, 0x34, 0x81, 0xa5, 0x1f, 0x7f,
+		0xf7, 0x70, 0x9b, 0x31, 0x05, 0x55, 0xe7, 0x87,
+		0xdc, 0x70, 0xa2, 0xc5, 0xd8, 0xb2, 0x09, 0xce,
+		0xa4, 0xb0, 0x7d, 0x53, 0xf5, 0x28, 0x91, 0x73}
+)
+
+// String returns a human-readable description.
+func (h Hash) String() string {
+	return fmt.Sprintf("hash:%x", h[:])
+}
+
+func (h *Hash) getWord(i int) uint64 {
+	return *(*uint64)(unsafe.Pointer(&h[i*8]))
+}
+
+func (h *Hash) setWord(i int, v uint64) {
+	*(*uint64)(unsafe.Pointer(&h[i*8])) = v
+}
+
+// Add merges two hash values commutatively.
+//
+// ∀ h, ∀ h2: h.Add(h2) == h2.Add(h)
+func (h Hash) Add(h2 Hash) Hash {
+	var tmp Hash
+	for i := 0; i < len(h)/8; i++ {
+		v0 := h.getWord(i)
+		v1 := h2.getWord(i)
+		tmp.setWord(i, v0+v1)
+	}
+	return tmp
+}
+
+// Merge combines the two hashes. This function is not commutative or
+// distributive.
+func (h Hash) Merge(h2 Hash) Hash {
+	var tmp Hash
+	// Right-rotate each word in h.
+	//
+	// It's safer to invoke highwayhash on the concatenation of h and h2, but
+	// Merge is rather performance critical so we do with a weaker combiner.
+	for i := 0; i < len(h)/8; i++ {
+		v0 := h.getWord(i) + 1
+		if v0&1 == 0 {
+			v0 = v0 >> 1
+		} else {
+			v0 = (v0 >> 1) | (uint64(1) << 63)
+		}
+		v1 := h2.getWord(i)
+		tmp.setWord(i, v0+v1)
+	}
+	return tmp
+}
+
+// String hashes a string.
+func String(s string) Hash {
+	return highwayhash.Sum(gunsafe.StringToBytes(s), stringSeed[:])
+}
+
+// Bytes hashes a byte array.
+func Bytes(data []byte) Hash {
+	return highwayhash.Sum(data, bytesSeed[:])
+}
+
+func hashIntWithSeed(v int64, seed Hash) Hash {
+	var buf [8]byte
+	binary.LittleEndian.PutUint64(buf[:], uint64(v))
+	return highwayhash.Sum(buf[:], seed[:])
+}
+
+// Bool hashes a boolean value.
+func Bool(b bool) Hash {
+	v := int64(0)
+	if b {
+		v = 1
+	}
+	return hashIntWithSeed(v, boolSeed)
+}
+
+// Int hashes an int64 value.
+func Int(v int64) Hash {
+	return hashIntWithSeed(v, intSeed)
+}
+
+// Float hashes an float64 value.
+func Float(v float64) Hash {
+	var buf [8]byte
+	*(*float64)(unsafe.Pointer(&buf[0])) = v
+	return highwayhash.Sum(buf[:], floatSeed[:])
+}
+
+// Time hashes a time.Time value.
+func Time(t time.Time) Hash {
+	return hashIntWithSeed(t.UnixNano(), timeSeed)
+}

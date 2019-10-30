@@ -1,0 +1,2 @@
+sample	conta_call	cf	sum_log_lr	avg_log_lr	snps	depth	pos_lr_all	pos_lr_x	pos_lr_chr_cv	y_count	pregnancy	excluded_regions	error_rate	T>A	G>A	C>A	A>T	G>T	C>T	A>G	T>G	C>G	A>C	T>C	G>C
+P004400	FALSE	0	0	0	813298	45	0	NA	NaN	0.2531	NA	10	3.28e-05	3.03e-05	2.12e-05	7e-05	2.9e-05	6.78e-05	2.1e-05	2.5e-05	2.55e-05	2.91e-05	2.5e-05	2.21e-05	2.78e-05

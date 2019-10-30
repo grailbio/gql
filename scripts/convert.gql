@@ -1,0 +1,6 @@
+// Convert between file formats
+
+// Use:
+//  grail-query convert.gql --in=path.tsv --out=path.btsv
+//  grail-query convert.gql --in=path.btsv --out=path.tsv
+write(read(in), out)

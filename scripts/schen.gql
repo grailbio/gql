@@ -1,0 +1,14 @@
+// Given a TSV file produced by spamtool, it counts allele frequency for each location,
+// then intersects the location with a BED file.
+allele_freq := func(row) {
+            a := cond(row.REF==`A`, 0, row.A);
+            c := cond(row.REF==`C`, 0, row.C);
+            g := cond(row.REF==`G`, 0, row.G);
+            t := cond(row.REF==`T`, 0, row.T);
+            depth := row.DEPTH - row.N;
+            {chrom: row.CHROM, start: row.POS, end: row.POS+1, af: float(max(a, c, g, t)) / float(depth)};
+};
+
+bed := read(`/scratch-nvme/schen/gene_bed.tsv`, type:=`bed`);
+af_table := read(`/scratch-nvme/schen/data_examples/P000T81.tsv`) | map(allele_freq(_));
+af_table | joinbed(bed, map:={$chrom, $start, $end, $af, feat.featname}) | write(`/tmp/af.tsv`);
