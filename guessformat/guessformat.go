@@ -9,7 +9,7 @@ import (
 	"github.com/grailbio/base/log"
 )
 
-// Type defines the type values in a TSV column.
+// Type defines possible types of a TSV column.
 type Type uint8
 
 const (
@@ -25,12 +25,47 @@ const (
 	minScoreDiff = 64
 )
 
+// IsNull reports if the string reprents a missing value, e.g., "", "NA", "N/A".
+func IsNull(v string) bool {
+	if v == "" {
+		return true
+	}
+	ch := v[0]
+	if ch != 'n' && ch != 'N' && ch != '#' && ch != '-' { // quick check
+		return false
+	}
+	if v == "#N/A" || v == "#N/A N/A" || v == "#NA" || v == "-NaN" ||
+		v == "-nan" || v == "N/A" || v == "NA" || v == "NULL" || v == "NaN" || v == "nan" {
+		return true
+	}
+	if len(v) >= 7 && ch == '-' && v[1] == '1' && v[3] == '#' &&
+		(v[4:] == "IND" || v[4:] == "QNAN") {
+		return true
+	}
+	return false
+}
+
+// ParseBool parses a boolean string. E.g., "true", "y", "Y" returns (true,
+// true).  A unparsable string returns (false, false).
+func ParseBool(v string) (value bool, ok bool) {
+	switch v {
+	case "Y", "yes":
+		return true, true
+	case "N", "no":
+		return false, true
+	}
+	b, err := strconv.ParseBool(v)
+	return b, (err == nil)
+}
+
 // T is used to guess the type of a column in a TSV file.
 //
 // The caller creates the object T for each column in the TSV file.  It then
 // feeds the values of the column through Add() incrementally. Once Add() has an
-// unambiguous gess of the column type, it returns one of String, Float, or Int.
+// unambiguous guess of the column type, it returns one of String, Float, Int,
+// or Bool.
 type T struct {
+	// Score counts the number of times each data type has appeared.
 	score        [numTypes]int
 	hasBestGuess bool
 	bestGuess    Type
@@ -58,7 +93,7 @@ func (t *T) Add(s string) Type {
 	if t.hasBestGuess {
 		return t.bestGuess
 	}
-	if s == "" || s == "NA" || s == "na" {
+	if IsNull(s) {
 		return Unknown
 	}
 	if _, err := strconv.ParseInt(s, 0, 64); err == nil {

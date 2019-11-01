@@ -5,10 +5,11 @@ import (
 	"github.com/grailbio/gql/guessformat"
 )
 
+// TSVColumn defines a column in a TSV-like file.
 type TSVColumn struct {
 	// Name is the column name
 	Name string
-	// Type the type of the cells in the column.
+	// Type is the type of the cells in the column.
 	Type ValueType
 	// Description is an optional description of the column.
 	Description string `json:",omitempty"`
@@ -16,11 +17,14 @@ type TSVColumn struct {
 
 // TSVFormat defines the format of a TSV file. JSON encodable.
 type TSVFormat struct {
-	HeaderLines int // copied from Format.HeaderLines
+	// HeaderLines is the number of comment lines at the beginning of the file.
+	// The value is typically 0 or 1.
+	HeaderLines int
 	// List of columns in each row.
 	Columns []TSVColumn
 }
 
+// GuessTSVFormat guesses a TSVFormat from the first few rows of a TSV file.
 func guessTSVFormat(path string, rawRows [][]string) TSVFormat {
 	if len(rawRows) == 0 {
 		return TSVFormat{0, nil}

@@ -20,6 +20,7 @@ import (
 	"github.com/grailbio/base/log"
 	"github.com/grailbio/base/traverse"
 	"github.com/grailbio/gql/columnsorter"
+	"github.com/grailbio/gql/guessformat"
 	"github.com/grailbio/gql/hash"
 	"github.com/grailbio/gql/marshal"
 	"github.com/grailbio/gql/symbol"
@@ -99,27 +100,8 @@ func (s *tsvTableScanner) Scan() bool {
 	return true
 }
 
-func isNull(v string) bool {
-	if v == "" {
-		return true
-	}
-	ch := v[0]
-	if ch != 'n' && ch != 'N' && ch != '#' && ch != '-' { // quick check
-		return false
-	}
-	if v == "#N/A" || v == "#N/A N/A" || v == "#NA" || v == "-NaN" ||
-		v == "-nan" || v == "N/A" || v == "NA" || v == "NULL" || v == "NaN" || v == "nan" {
-		return true
-	}
-	if len(v) >= 7 && ch == '-' && v[1] == '1' && v[3] == '#' &&
-		(v[4:] == "IND" || v[4:] == "QNAN") {
-		return true
-	}
-	return false
-}
-
 func (t *TSVTable) parseRowString(rowStr string, typ ValueType) Value {
-	if isNull(rowStr) {
+	if guessformat.IsNull(rowStr) {
 		return Null
 	}
 	switch typ {
@@ -134,23 +116,15 @@ func (t *TSVTable) parseRowString(rowStr string, typ ValueType) Value {
 		}
 		Panicf(t.ast, "parserow: %v cannot be parsed as integer: %v", rowStr, err)
 	case FloatType:
-		v, err := strconv.ParseFloat(rowStr, 64)
-		if err == nil {
+		if v, err := strconv.ParseFloat(rowStr, 64); err == nil {
 			return NewFloat(v)
 		}
-		Panicf(t.ast, "parserow: %v cannot be parsed as float: %v", rowStr, err)
+		Panicf(t.ast, "parserow: %v cannot be parsed as float", rowStr)
 	case BoolType:
-		switch rowStr {
-		case "Y", "yes":
-			return True
-		case "N", "no":
-			return False
-		}
-		v, err := strconv.ParseBool(rowStr)
-		if err == nil {
+		if v, ok := guessformat.ParseBool(rowStr); ok {
 			return NewBool(v)
 		}
-		Panicf(t.ast, "parserow: %v cannot be parsed as bool: %v", rowStr, err)
+		Panicf(t.ast, "parserow: %v cannot be parsed as bool", rowStr)
 	case StringType:
 		return NewString(rowStr)
 	case FileNameType:
@@ -168,7 +142,6 @@ func (t *TSVTable) parseRowString(rowStr string, typ ValueType) Value {
 		if v.Type() != typ {
 			Panicf(t.ast, "parserow: %v cannot be parsed as datetime or date (%v)", rowStr, typ)
 		}
-
 		return v
 	}
 	Panicf(t.ast, "parserow: unknown data type %v", typ)
@@ -348,8 +321,11 @@ func (t *TSVTable) Scanner(ctx context.Context, start, limit, total int) TableSc
 	return sc
 }
 
-// NewTSVTable creates a Table for reading the given TSV file.  tableName is
-// just for logging. "h" is the hash of the inputs that generates this table.
+// NewTSVTable creates a Table for reading the given TSV file.  "h" is the hash
+// of the input sources that generate this table. "fh" is typically a
+// tsvFileHandler and is used to parse the file and serialize the
+// table. "format" is an optional format spec for the file. If format=nil, this
+// function guesses the column types from the file contents.
 func NewTSVTable(path string, ast ASTNode, h hash.Hash, fh FileHandler, format *TSVFormat) Table {
 	Debugf(ast, "NewTSVTable %s: missed cache (hash %v) ", path, h)
 	if fh == nil {

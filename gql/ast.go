@@ -10,16 +10,32 @@ import (
 	"encoding/gob"
 	"fmt"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"text/scanner"
 	"time"
 
 	"github.com/grailbio/base/log"
 	"github.com/grailbio/gql/hash"
-	"github.com/grailbio/gql/marshal"
 	"github.com/grailbio/gql/symbol"
 	"github.com/grailbio/gql/termutil"
 )
+
+// EncodeGOB is a convenience function for encoding a value using gob.  It
+// crashes the process on error.
+func encodeGOB(ast ASTNode, enc *gob.Encoder, val interface{}) {
+	if err := enc.Encode(val); err != nil {
+		Panicf(ast, "gob: failed to encode %v: %v", val, err)
+	}
+}
+
+// DecodeGOB is a convenience function for decoding a value using gob.  It
+// crashes the process on error.
+func decodeGOB(ast ASTNode, dec *gob.Decoder, val interface{}) {
+	if err := dec.Decode(val); err != nil {
+		Panicf(ast, "gob: failed to decode %v: %v: %v", val, err, string(debug.Stack()))
+	}
+}
 
 // ASTNode represents an abstract syntax tree node. One ASTnode is created for a
 // syntactic element found in the source script.  Implementations of ASTNode
@@ -803,9 +819,9 @@ var _ ASTNode = &ASTStructFieldRegex{}
 func (n *ASTStructFieldRegex) MarshalBinary() ([]byte, error) {
 	buf := bytes.Buffer{}
 	enc := gob.NewEncoder(&buf)
-	marshal.EncodeGOB(enc, &n.parent)
-	marshal.EncodeGOB(enc, n.re.String())
-	marshal.EncodeGOB(enc, &n.Pos)
+	encodeGOB(n, enc, &n.parent)
+	encodeGOB(n, enc, n.re.String())
+	encodeGOB(n, enc, &n.Pos)
 	return buf.Bytes(), nil
 }
 
@@ -813,11 +829,11 @@ func (n *ASTStructFieldRegex) MarshalBinary() ([]byte, error) {
 func (n *ASTStructFieldRegex) UnmarshalBinary(data []byte) error {
 	buf := bytes.NewReader(data)
 	dec := gob.NewDecoder(buf)
-	marshal.DecodeGOB(dec, &n.parent)
+	decodeGOB(n, dec, &n.parent)
 	var reStr string
-	marshal.DecodeGOB(dec, &reStr)
+	decodeGOB(n, dec, &reStr)
 	n.re = regexp.MustCompile(reStr)
-	marshal.DecodeGOB(dec, &n.Pos)
+	decodeGOB(n, dec, &n.Pos)
 	return nil
 }
 

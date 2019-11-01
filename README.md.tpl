@@ -1,13 +1,11 @@
 # Grail query language
 
-Last updated: 2019-03-25.
-
 GQL is a bioinformatics query language. You can think of it as an SQL with a funny
 syntax.
 
 - It can read and write files on S3 directly.
 
-- It can read common bioinformatic files, such as TSV, BAM, BED as tables.
+- It can read common bioinformatics files, such as TSV, BAM, BED as tables.
 
 - It can handle arbitrarily large files regardless of the memory capacity of the
   machine. All data processing happens in a streaming fashion.
@@ -18,7 +16,7 @@ syntax.
 - GQL language syntax is very different from SQL, but if you squint enough, you
   can see the correspondence with SQL. GQL syntax differs from SQL for several
   reasons. First, GQL needs to support hierarchical information. For example,
-  sequence or quality data in a BAM record is treated as a subtable inside a
+  sequencing or quality data in a BAM record is treated as a subtable inside a
   parent BAM table.  SQL handles such queries poorly - for example, SQL cannot
   read tables whose names are written in a column in another table. Second, some
   GQL functions, such as `transpose`, have no corresponding SQL counterpart.

@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
-	"runtime/debug"
 	"sync"
 
 	"github.com/grailbio/base/log"
@@ -13,23 +12,7 @@ import (
 	"github.com/grailbio/gql/hash"
 )
 
-// EncodeGOB is a convenience function for encoding a value using gob.  It
-// crashes the process on error.
-func EncodeGOB(enc *gob.Encoder, val interface{}) {
-	if err := enc.Encode(val); err != nil {
-		log.Panicf("gob: failed to encode %v: %v", val, err)
-	}
-}
-
-// DecodeGOB is a convenience function for decoding a value using gob.  It
-// crashes the process on error.
-func DecodeGOB(dec *gob.Decoder, val interface{}) {
-	if err := dec.Decode(val); err != nil {
-		log.Panicf("gob: failed to decode %v: %v: %v", val, err, string(debug.Stack()))
-	}
-}
-
-// Encoder is used to encode GQL values.
+// Encoder serializes GQL values.
 type Encoder struct {
 	buf  []byte
 	syms map[string]int64
@@ -69,6 +52,10 @@ func ReleaseEncoder(enc *Encoder) []byte {
 	return data
 }
 
+// Reset resets the object so that it can be used for another round of
+// encoding. If buf!=nil, the encoder takes ownership of the buffer and appends
+// to the buffer (the buffer will be reallocated if it turns out to be too small
+// for the encode data). If buf=nil, the encoder allocates a new buffer.
 func (e *Encoder) Reset(buf []byte) {
 	for k := range e.syms {
 		delete(e.syms, k)
